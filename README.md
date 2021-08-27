@@ -1,0 +1,1 @@
+RUN : `cd hi-world`, `sbt`, `~run`

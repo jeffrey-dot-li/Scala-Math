@@ -19,13 +19,14 @@ object Main {
       val getDerivative: () => Differentiable
   ) extends Functional(compute) {
 
-    // Product Rule
 
     // Summation Rule
     def +(other: Differentiable): Differentiable = new Differentiable(
       (x: Double) => compute(x) + other.compute(x),
       () => (this.getDerivative() + other.getDerivative())
     );
+
+    // Product Rule
 
     def *(other: Differentiable): Differentiable = new Differentiable(
       (x: Double) => compute(x) * other.compute(x),
@@ -38,6 +39,7 @@ object Main {
     );
 
   }
+  
   val zeroF: Differentiable = new Differentiable((x: Double) => 0, () => zeroF);
 
   implicit def fromConst(value: Double): Differentiable =
@@ -58,12 +60,13 @@ object Main {
       ));
 
   def main(args: Array[String]): Unit = {
-    val someFn = powF(-1)(expF(X));
+    // val someFn = powF(-1)(expF(X)); // (e^x)^-1
+    val someFn = sinF(cosF(X))*expF(X) * 2;
+
     val someDerivative = someFn.getDerivative();
 
     val x = 3;
     println(someFn(x));
     println(someDerivative(x));
-    println("Hello world!")
   }
 }
