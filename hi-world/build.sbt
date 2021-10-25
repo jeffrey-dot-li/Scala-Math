@@ -1,7 +1,8 @@
 
 // The simplest possible sbt build file is just one line:
 
-scalaVersion := "2.13.3"
+scalaVersion := "2.13.6"
+crossScalaVersions ++= Seq("2.13.6", "3.0.0")
 // That is, to create a valid sbt build, all you've got to do is define the
 // version of Scala you'd like your project to use.
 
@@ -9,13 +10,26 @@ scalaVersion := "2.13.3"
 
 // Lines like the above defining `scalaVersion` are called "settings". Settings
 // are key/value pairs. In the case of `scalaVersion`, the key is "scalaVersion"
-// and the value is "2.13.3"
+// and the value is "2.13.5"
 
 // It's possible to define many kinds of settings, such as:
 
 name := "hello-world"
 organization := "ch.epfl.scala"
 version := "1.0"
+
+
+// Shapeless
+resolvers ++= Seq(
+  Resolver.sonatypeRepo("releases"),
+  Resolver.sonatypeRepo("snapshots")
+)
+
+libraryDependencies += ("com.chuusai" %% "shapeless" % "2.3.7").cross(CrossVersion.for3Use2_13)
+// Cats
+// scalacOptions += "-Ypartial-unification"
+libraryDependencies += "org.typelevel" %% "cats-core" % "2.6.1"
+libraryDependencies += "org.typelevel" %% "algebra" % "2.2.3"
 
 // Note, it's not required for you to define these three settings. These are
 // mostly only necessary if you intend to publish your library's binaries on a
@@ -25,8 +39,7 @@ version := "1.0"
 // Want to use a published library in your project?
 // You can define other libraries as dependencies in your build like this:
 
-libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.1.2"
-
+libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.1.0"
 // Here, `libraryDependencies` is a set of dependencies, and by using `+=`,
 // we're adding the scala-parser-combinators dependency to the set of dependencies
 // that sbt will go and fetch when it starts up.
