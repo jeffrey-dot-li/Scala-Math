@@ -1,8 +1,9 @@
-
 // The simplest possible sbt build file is just one line:
 
+javacOptions ++= Seq("-source", "11")
+
 scalaVersion := "2.13.6"
-crossScalaVersions ++= Seq("2.13.6", "3.0.0")
+crossScalaVersions ++= Seq("2.13.6", "3.1.0")
 // That is, to create a valid sbt build, all you've got to do is define the
 // version of Scala you'd like your project to use.
 
@@ -17,8 +18,6 @@ crossScalaVersions ++= Seq("2.13.6", "3.0.0")
 name := "hello-world"
 organization := "ch.epfl.scala"
 version := "1.0"
-
-
 // Shapeless
 resolvers ++= Seq(
   Resolver.sonatypeRepo("releases"),
@@ -26,6 +25,11 @@ resolvers ++= Seq(
 )
 
 libraryDependencies += ("com.chuusai" %% "shapeless" % "2.3.7").cross(CrossVersion.for3Use2_13)
+libraryDependencies += "cc.redberry" %% "rings.scaladsl" % "2.5.8"
+
+libraryDependencies += "org.scalanlp" %% "breeze" % "1.1"
+libraryDependencies += "org.scalanlp" %% "breeze-viz" % "1.1"
+// libraryDependencies ++= Seq("org.typelevel" %% "shapeless3-deriving" % "3.0.1")
 // Cats
 // scalacOptions += "-Ypartial-unification"
 libraryDependencies += "org.typelevel" %% "cats-core" % "2.6.1"
@@ -34,7 +38,6 @@ libraryDependencies += "org.typelevel" %% "algebra" % "2.2.3"
 // Note, it's not required for you to define these three settings. These are
 // mostly only necessary if you intend to publish your library's binaries on a
 // place like Sonatype or Bintray.
-
 
 // Want to use a published library in your project?
 // You can define other libraries as dependencies in your build like this:
@@ -45,7 +48,6 @@ libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % 
 // that sbt will go and fetch when it starts up.
 // Now, in any Scala file, you can import classes, objects, etc., from
 // scala-parser-combinators with a regular import.
-
 // TIP: To find the "dependency" that you need to add to the
 // `libraryDependencies` set, which in the above example looks like this:
 

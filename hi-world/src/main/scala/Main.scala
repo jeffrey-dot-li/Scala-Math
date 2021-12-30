@@ -1,10 +1,9 @@
 import math._
-import shapeless._
-import nat._
-import newtype._
 import scala.language.implicitConversions
 import scala.collection._
-
+import algebra.ring._
+import shapeless.Nats
+// import Somebody
 object Test {
   import shapeless._
   import nat._
@@ -22,9 +21,14 @@ object Test {
     : Sized[Seq[(A, B)], N] =
     Sized.wrap[Seq[(A, B)], N](l.unsized zip r.unsized)
 
-  class OOField[T] {}
+  // val nat: Nat = 3;
+  // Type N = 3;
+  // val sizedBoi : Sized[Seq[Int], N] = Sized(1,2,3)
 
-  abstract class FieldWithOps[T] extends Field[T] {}
+  // Define like n-vector, and n-vector transpose.
+  // Define product which sends v * v^t => 1x1
+  
+
 
   val doubleScalarField = new Field[Double] {
     def div(x: Double, y: Double): Double = x / y
@@ -38,7 +42,7 @@ object Test {
 
   // class Monoid[]
 
-  class PolynomialRing[N <: Nat, ScalarType, VF <: VectorField[N, ScalarType]]
+  class PolynomialRing[VF <: VectorField[N, ScalarType], N <: Nat, ScalarType]
     (val vectorField: VF) {
     def scalarField = vectorField.scalarField
     type NVectorType = vectorField.NVectorType
@@ -79,7 +83,7 @@ object Test {
       newtype[PolyType, PolyOps](v)
   }
 
-  class MonoidExtension[N <: Nat, ElementType, +MonoidField <: Monoid[ElementType]]
+  class MonoidExtension[+MonoidField <: Monoid[ElementType], N <: Nat, ElementType]
     (val monoid: MonoidField, n: N)(implicit dim: ToInt[N]) {
     type SeqType = Sized[Seq[ElementType], N];
     type NSeqType = Newtype[SeqType, SeqOps];
@@ -152,11 +156,33 @@ object Test {
 
   // class PolynomialRing
 
-  def reeeeee() = {
+  class Super {
+    def doSomething = {
+      implemented
+      println(implementedVal)
+    };
+    def implemented = println("Super");
 
-    val ree = toInt(Nat._0);
-    val vectorField = new VectorField(doubleScalarField, Nat._4);
-    println(vectorField.AdditiveGroup.empty)
+    val implementedVal = "super val";
+
+    class ImplementedClass {
+      val k = "super class field";
+    }
+
+  }
+
+  class Subclass extends Super {
+    override def implemented: Unit = println("Subclass")
+    override val implementedVal: String = "sub val";
+    class ImplementedClass extends super.ImplementedClass {}
+
+  }
+  def reeeeee() = {
+    val k = new Subclass()
+    k.doSomething;
+    // Nat._0.n
+    // val vectorField = new VectorField(doubleScalarField, Nat._4);
+    // println(vectorField.AdditiveGroup.empty)
     // val v1 = vectorField(Sized(1.0));
     // val v2 = v1 + v1
     // val extendedHdrs = List("Title", "Author", "ISBN")
@@ -222,17 +248,22 @@ object Main {
       ));
 
   def main(args: Array[String]): Unit = {
+    import Polytopia._;
+    Polytopia.main();
 
-    Test.reeeeee()
-    // class Animal[Legs <: Int with Singleton](implicit v: ValueOf[Legs]) {
-    //   def legs = v.value
-    // }
-    // val reee = new Animal[10]
-    // println(reee.legs)
+    type Seven = 7
+    // val v = valueOf 
+
+    class Animal[Legs <: Int with Singleton](implicit v: ValueOf[Legs]) {
+      def legs = v.value
+    }
+    val reee = new Animal[Seven]
+    println(reee.legs)
     // // val someFn = powF(-1)(expF(X)); // (e^x)^-1
     // val someFn = sinF(cosF(X)) * expF(X) * 2;
 
     // val someDerivative = someFn.getDerivative();
+
 
     // val x = 3;
     // println(someFn(x));
