@@ -251,14 +251,14 @@ object Main {
     import Polytopia._;
     Polytopia.main();
 
-    type Seven = 7
-    // val v = valueOf 
+    // type Seven = 7
+    // // val v = valueOf 
 
-    class Animal[Legs <: Int with Singleton](implicit v: ValueOf[Legs]) {
-      def legs = v.value
-    }
-    val reee = new Animal[Seven]
-    println(reee.legs)
+    // class Animal[Legs <: Int with Singleton](implicit v: ValueOf[Legs]) {
+    //   def legs = v.value
+    // }
+    // val reee = new Animal[Seven]
+    // println(reee.legs)
     // // val someFn = powF(-1)(expF(X)); // (e^x)^-1
     // val someFn = sinF(cosF(X)) * expF(X) * 2;
 
@@ -270,3 +270,41 @@ object Main {
     // println(someDerivative(x));
   }
 }
+
+
+    // trait Addable
+    // {
+    //     def +(o : Addable) : Addable
+    // }
+
+    // def compose[A <: Addable](a : A, b: A) = a + b
+
+    // // compose(1,2)
+
+    // trait Adder[A]{
+    //     def add(x: A, y:A) : A
+    // }
+    // def combine[A](x:A, y:A)(implicit adder : Adder[A]) : A = adder.add(x,y)
+
+
+    // trait Compose[A, B ,C]
+    // {
+    //     def compose(a: A, b :B) : C
+    // }
+
+    // trait Monoid[A] extends Compose[A, A, A]
+    // {
+    //     def id : A
+    //     override def compose(a :A, b : A) : A
+    // }
+
+    // def arrayMultiply[A, B, C](x : Array[A], y : Array[B])
+    //     (implicit mult : Compose[A, B, C], add : Monoid[C], c: ClassTag[C])  = 
+    //     x.zip(y).map(t => mult.compose(t._1, t._2)).fold(add.id)(add.compose)
+
+
+    // implicit object AdditiveIntegers extends Monoid[Int]
+    // {
+    //     def id: Int = 0
+    //     override def compose(a: Int, b: Int): Int = a +b
+    // }
