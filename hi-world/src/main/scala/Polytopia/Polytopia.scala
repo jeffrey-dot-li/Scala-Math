@@ -1,4 +1,4 @@
-package Polytopia
+package polytopia
 
 import cc.redberry.rings
 import cc.redberry.rings.poly.multivar.MultivariatePolynomial
@@ -13,11 +13,18 @@ import scala.reflect.runtime.universe._
 import scala.reflect.ClassTag
 import org.apache.commons.math3.analysis.function.Add
 
-object Polytopia {
+object Main {
+    def printArray[A](v: Array[A]) = println(v.mkString(" "));
+    def printlnArray[A](v: Array[A]) = println(v.mkString("\n \n"));
 
     implicit class ArrayExt[A](v: Array[A]) {
         def mapWithIndex[B](f: (A, Int) => B)(implicit ct: ClassTag[B]) =
             Array.tabulate(v.length) { i => f(v(i), i) }
+    }
+
+    implicit class MatrixExt(c: Cartan) {
+        def colRepr = Array.tabulate(c.cols)(i => c(::, i))
+        def rowRepr = c.t.colRepr;
     }
 
     // implicit object AdditivePoly extends Monoid[]
@@ -46,16 +53,8 @@ object Polytopia {
               else
                   0
       ),
-      'C' -> ((n: Int) =>
-          (i: Int, j: Int) =>
-              if (i - j == 0) 2
-              else if (i == n - 1 && j == n - 2) -2
-              else if (math.abs(i - j) == 1) -1
-              else
-                  0
-      ),
-      'K' ->
-          //   Same as C except the first root is longer than the rest instead of the last being the longest
+      'C' ->
+          //   First root is longest, rather than the last root from Bourbaki.
           ((n: Int) =>
               (i: Int, j: Int) =>
                   if (i - j == 0) 2
@@ -64,6 +63,29 @@ object Polytopia {
                   else
                       0
           ),
+      'D' ->
+          // The first node is adjacent to node 3, rest is same as A_(n-1)
+          // Inverted from Bourbaki
+          ((n: Int) =>
+              (i: Int, j: Int) =>
+                  if (i - j == 0) 2
+                  else if (i == 0 || j == 0)
+                      if (i == 2 || j == 2) -1 else 0
+                  else if (math.abs(i - j) == 1) -1
+                  else
+                      0
+          ),
+      'E' ->
+          ((n: Int) =>
+              (i: Int, j: Int) =>
+                  if (i - j == 0) 2
+                  else if (i == 0 || j == 0)
+                      if (i == 3 || j == 3) -1 else 0
+                  // The first node is adjacent to node 4, rest is same as A_(n-1)
+                  // Inverted from Bourbaki
+                  else if (math.abs(i - j) == 1) -1
+                  else 0
+          ),
       'F' ->
           ((n: Int) =>
               (i: Int, j: Int) =>
@@ -71,6 +93,16 @@ object Polytopia {
                   else if (i - j == 0) 2
                   else if (math.abs(i - j) == 1) -1
                   else 0
+          ),
+      'G' ->
+          //   First root is longest, rather than the last root from Bourbaki.
+          ((n: Int) =>
+              (i: Int, j: Int) =>
+                  if (i - j == 0) 2
+                  else if (i == 0 && j == 1) -3
+                  else if (math.abs(i - j) == 1) -1
+                  else
+                      0
           )
     )
 
@@ -82,6 +114,7 @@ object Polytopia {
         def -->[A](g: A => B) = (v: A) => f(g(v))
     }
     implicit def functionExp[A](f: Op[A]) = new AnyRef {
+
         def exp(n: Int): A => A = if (n <= 1) f else f --> this.exp(n - 1);
         def **(n: Int) = exp(n)
     }
@@ -114,14 +147,6 @@ object Polytopia {
                 )
                 .reduce((a, b) => a * b);
 
-    // def reflect[E](i: Int, c: Cartan)(implicit r: MultivariateRing[E]) =
-    //     (m: Monomial[E]) =>
-    //         m.coefficient * r.generators.zipWithIndex
-    //             .map { case (p, j) =>
-    //                 (p - c(i, j) * r.generators(i)).pow((m.exponents)(j))
-    //             }
-    //             .reduce((a, b) => a * b);
-
     implicit def PolynomialReduce[E](s: (Monomial[E]) => MP[E]): Op[MP[E]] =
         (p) => p.toArray().map(s).reduce((a, b) => a + b)
 
@@ -151,11 +176,94 @@ object Polytopia {
         return (if (poly.isZero) "0" else Factor(poly).toString())
     }
 
-    def main() = {
+    // Conjecture testing on matrix representations of (F4) Weyl Group.
+    val baseArray = Array(Array(0), Array(1), Array(2), Array(3));
+
+    /** Generates `n` matrices of dimension `n x n` corresponding to the Weyl Group reflections
+      * generators `s_i` in the basis `x_i`.
+      *
+      * @param c
+      *   Cartan Matrix of Weyl Group
+      * @return
+      *   Array[Matrix] - n length array of n x n integer matrixes - integer if group is
+      *   semi-simple.
+      */
+    def genReflectionMatrixs(c: Cartan): Array[Cartan] = {
+        return Array.tabulate(c.cols)((i) =>
+            linalg.DenseMatrix
+                .eye[Int](c.cols)
+                .mapPairs((p, v) =>
+                    if (p._2 == i)
+                        if (p._1 == p._2) -1
+                        else -c(p._2, p._1)
+                    else if (p._1 == p._2) 1
+                    else 0
+                )
+        )
+    }
+
+    def genWeylGroupMatrixs(dim: Int, sM: Array[Cartan], max: Int = Int.MaxValue)
+        : Array[(Chain, Cartan)] = {
+
+        val mId = linalg.DenseMatrix.eye[Int](dim);
+
+        type mOp = linalg.DenseMatrix[Int]
+
+        // Tuple of Weyl Chain and corresponding Matrix Representation.
+        type ZooResident = (Chain, mOp)
+        var zoo = Array[ZooResident]()
+        val zooEntrance = collection.mutable.PriorityQueue
+            .empty[(Chain, mOp)](Ordering.by((_: (Chain, mOp))._1.length).reverse)
+        zooEntrance.addOne((Array[Int](), mId));
+
+        var negCount = 0
+        var dupCount = 0;
+
+        while (zooEntrance.nonEmpty && zoo.length <= max) {
+            val moo = zooEntrance.dequeue()
+            val found = zoo.find((k) => k._2 == moo._2)
+            if (found != None) {
+                dupCount += 1;
+            }
+            if (found == None) {
+                zoo +:= moo
+
+                for (i <- 0 until dim) {
+                    val ithRow = moo._2(i, ::);
+                    val hasNeg = ithRow.t.toScalaVector().find((k) => (k < 0)) != None;
+                    if (hasNeg) {
+                        negCount += 1;
+                    }
+                    if (!hasNeg) {
+                        val k = (i +: moo._1, sM(i) * moo._2)
+                        zooEntrance += k
+                    }
+                }
+            }
+        }
+        println(dupCount + negCount)
+        return zoo;
+    }
+
+    def getPermutations(n: Int): Array[Array[Int]] = {
+        if (n == 1) return baseArray
+        else {
+            val prev = getPermutations(n - 1)
+            return baseArray.map(k => prev.map(s => s ++ k)).reduce((a, b) => a ++ b)
+        }
+    }
+
+    def testZooResidents() {}
+
+    def main(): Unit = {
+
         implicit val dim = 4;
+        val rootSystem = RootSystems('F');
+				//  Conjecture: G3+ is infinite? F5+, E9+ also infinite?
+				// Trying to generate the G3 matrices will give you a group with infinite order?
+
         val rangle = Array.range(0, dim).map((k) => s"a_$k")
         implicit val ring = MultivariateRing(Q, rangle);
-        val rootSystem = RootSystems('F');
 
         implicit val c: Cartan = CartanMatrix(dim, rootSystem)
 
@@ -167,99 +275,23 @@ object Polytopia {
 
         val D = s.mapWithIndex((refl, index) => Differential(a_)(ring)(refl, index));
 
-        val xd = Array(Array(0), Array(1), Array(2), Array(3));
-        def getPermutations(n: Int): Array[Array[Int]] = {
-            if (n == 1) return xd
-            else {
-                val prev = getPermutations(n - 1)
-                return xd.map(k => prev.map(s => s ++ k)).reduce((a, b) => a ++ b)
-            }
-        }
-
-        // println(getPermutations(1).length)
-        // println(getPermutations(2).length)
-
-        def doTestingThings(p: ring.PolyType) : Array[Array[Int]] = {
-            var ones = Array[Array[Int]]()
-            for (chain <- getPermutations(p.degree())) {
-                val dunno = opArray2Op(chain.map(i => D(i)))
-                val result = dunno(p)
-                if (result == ring.one) {
-                    ones = ones :+ chain;
-                }
-            }
-            return ones;
-        }
-
-        val maxs = Array[ring.PolyType](
-            (x_(0)^1) * (x_(1)^2),
-            (x_(2))^4,
-            (x_(3))^6
-        );
-
-        // val maxsOnesTested = maxs.map(doTestingThings)
-        // for(icu <- 0 until maxs.length)
-        // {
-        //     val chainOfChains = maxsOnesTested(icu)
-        //     if(chainOfChains.length == 0)
-        //     {
-        //         println("YAY INDEX :" + icu)
-        //     }
-        //     else
-        //         {
-        //             println("FUCK INDEX: " + icu)
-        //             println(chainOfChains.length)
-        //             println(chainOfChains(0).mkString(" "))
-        //         }
-        // }
-
-        // var chains = Array[Chain](
-        //     Array(0),
-        //     Array(0,1),
-        //     Array(2,1,2),
-        //     Array(3,2,1,2,3)
-        // );
-
         def PartialChain(ch: Chain) = ch.map(D);
         def MonoChain(ch: Chain) = (x_(ch.last) ^ (ch.length));
-        var chains = Array[Chain](
-          Array(1, 0),
-          Array(1),
-          Array(2, 1, 2),
-          Array(3, 2, 1, 2, 3)
-        );
-        var monos = chains.map(MonoChain)
-        var partialChains = chains.map(PartialChain);
-        // println(partialChains(0)(monos(0)))
 
-        // var weirdBoi = id --> partialChains(0) --> (partialChains(3)) --> (partialChains(2)) --> (partialChains(1))
-        // var total = monos.reduce((a, b) => a*b);
-        // println(weirdBoi(total)) - reduces to 1
+        // Maximal chains in F4.
+        // var chains = Array[Chain](
+        //   Array(1, 0),
+        //   Array(1),
+        //   Array(2, 1, 2),
+        //   Array(3, 2, 1, 2, 3)
+        // );
+        // var monos = chains.map(MonoChain)
+        // var partialChains = chains.map(PartialChain);
 
-        // var andy = D(2) --> D(1);
-        // println(andy(x_(1)^2)) // D1 D2 x_1^2 when x_1 > x_2 reduces to 2
+        // Matrix representation of reflections in `x_i`.
+        val sM = genReflectionMatrixs(c);
 
-        // var randy = Array(0,1,2)
-        // println("randy: " + PartialChain(randy)(MonoChain(randy) ));
-
-        // var sandy = Array(2,1,2,3)
-        // println("sandy: " + PartialChain(sandy)(MonoChain(sandy) ));
-
-        val sM = s.mapWithIndex((_, i) =>
-            linalg.DenseMatrix
-                .eye[Int](dim)
-                .mapPairs((p, v) =>
-                    if (p._2 == i)
-                        if (p._1 == p._2) -1
-                        else -c(p._2, p._1)
-                    else if (p._1 == p._2) 1
-                    else 0
-                )
-        );
-
-        
-        // switch operators as matrix on basis of x_i
-
+        // Column vector representations of `x_i`
         val xV = x_.mapWithIndex((_, i) =>
             linalg.DenseVector
                 .zeros[Double](dim)
@@ -269,169 +301,34 @@ object Polytopia {
                 )
         )
 
-        println(sM(0))
-        println(" ")
-        println(sM(1))
-        println(" ")
-        // println(sM(2))
-        // println(" ")
-        // println(sM(3))
-        // println(" ")
-        println(sM(0)*sM(1));
-        println(" ")
+        // Weyl Group matrix representation
+        val wM = genWeylGroupMatrixs(dim, sM, 1500);
 
-        println(sM(1)*sM(0)*sM(1));
-        println(" ")
-        
-        println(sM(1)*sM(0));
-        println(" ") 
-        
+        // Checks that in all matrixes of the Weyl Representation,
+        // each row is either positive or negative semidefinite.
+        // There are no rows that contain both positive and negative numbers.
 
-        
+        // Checked for An, Bn, Cn, Dn, F4, G2 | n <= 4.
 
-        // D(i) M x(j) = M(i,j)
-
-        // println((s(1) --> s(2) --> s(1))(x_(1)))
-
-        // println(sM(1) * sM(2) *sM(1) * xV(1))
-
-        val mId = linalg.DenseMatrix.eye[Int](dim);
-
-        // if s_i s_2 s_j has a -1 in any row row k
-        // then \partial_k \partial_i \partial_j = 0
-        type mOp = linalg.DenseMatrix[Int]
-        type ZooResident = (Chain, mOp)
-        var zoo = Array[ZooResident]()
-        val zooEntrance = collection.mutable.PriorityQueue.empty[(Chain, mOp)](Ordering.by((_:(Chain, mOp))._1.length).reverse)
-        zooEntrance.addOne((Array[Int](), mId));
-
-        var negCount = 0
-        var dupCount = 0;
-
-        while(zooEntrance.nonEmpty)
-        {
-            val moo = zooEntrance.dequeue()
-            val found = zoo.find((k) => k._2 == moo._2)
-            if(found != None)
-            {
-                dupCount+=1;
-            }
-            if(found == None)
-            {
-                zoo +:= moo
-
-                for(i <- 0 until dim)
-                {
-                    // if(sM(i) * moo._2 != moo._2 * sM(i))
-                    // {
-                    // }
-                    val ithRow = moo._2(i,::);
-                    // val hasNeg = false
-                    val hasNeg = ithRow.t.toScalaVector().find((k) => (k < 0)) != None;
-                    if(hasNeg)
-                    {
-                        negCount+=1;
+				// Also checked for G3, E6, F5 |W| <= 1500
+        def checkSemiDefinite(m: Cartan): Boolean = {
+            for (row <- m.rowRepr) {
+                var numRep = 0;
+                for (j <- row) {
+                    if (j < 0) {
+                        if (numRep > 0) return false;
+                        numRep = -1;
                     }
-                    if(!hasNeg)
-                    {
-                        val k = (i +: moo._1,  sM(i) * moo._2)
-                        zooEntrance+= k
+                    if (j > 0) {
+                        if (numRep < 0) return false;
+                        numRep = 1;
                     }
                 }
             }
+            return true;
         }
-        println("negatives: " + negCount + " dups: " + dupCount)
-
-        /** Theory - chain (K) len (r) is zero iff there is other chain (K2) with len (r2) so that
-          * s_K = s_K2 but r > r2.
-          *
-          * D_K = 0 IFF <-> K is non-minimal / reducible. IFF len(K) > height(s_K)
-          *
-          * So then if you have D_i on the matrix with negative numbers it means that there is
-          * smaller chain that produces the same reflection in the Weyl group.
-          *
-          * Like basically the negative number in whatever ith row is telling you basically that its
-          * already reflection conjugate under s_i
-          *
-          * Like for example s_1 (s_2 s_1 s_2) = s_2 s_1
-          *
-          * For the ones with negative in the row - does s_i positive it?
-          *
-          * Theorem - if you apply s_i on a chain matrix where there is neg in ith row, Then there
-          * is smaller K2 which gives you same refl group element.
-          *
-          * // println("negatives: " + negCount + " dups: " + dupCount)
-          *
-          * 2304 negatives (2 * 1152) and 1153 dups (1152 + 1)
-          * --> The +1 comes from because you first populate the zooEntrance with Identity, so it
-          * double counts Id, and thats all.
-          *
-          * negs is where you have an equal chain of strictly smaller size dups is then where you
-          * have an equal chain of strictly equal size
-          *
-          * Without the (hasNeg) filter, you get 3458 (= 1154 + 2304) dups. Which means that every
-          * single chain that failed the hasNeg filter was a dup. hasNeg therefore must be the same
-          * thing as <--> !irreducible
-          *
-          * Assume you have chain K_r. Assume D_j s_K x_i < 0 for some i, j. Assume S(K_r) {i,j}
-          * element at {i,j} in the S(K_r) matrix is negative Then s_j S(K_r) = S(K_r2) for some
-          * chain K_r2 with r2 < r1.
-          */
-
-        // var tested = 0;
-        // for(w <- zoo)
-        // {
-        //     for(i <- 0 until dim)
-        //     {
-        //         var negTested = false;
-        //         for(j <- 0 until dim)
-        //         {
-        //             if(w._2(i,j) < 0 && !negTested)
-        //             {
-        //                 val sw = sM(i) * w._2;
-        //                 val minimal = zoo.find(k => k._2 == sw);
-        //                 if(minimal==None)
-        //                 {
-        //                     throw new Exception("reeeee")
-        //                 }
-        //                 else
-        //                 {
-        //                     if(w._1.length  > minimal.get._1.length)
-        //                     {
-        //                         // yay
-        //                         negTested = true;
-        //                         tested+=1;
-        //                     }
-        //                     else
-        //                         {
-        //                             println("FUCKKKK")
-        //                             println("i: " + i)
-        //                             println("w: " + w._1.mkString(" "))
-        //                             println("wmin: " + minimal.get._1.mkString(" "))
-        //                             throw new Exception("FUCKKKKKKKKK")
-        //                         }
-        //                 }
-        //                 // if(minimal != None && minimal.)
-        //             }
-        //         }
-        //     }
-        // }
-        // println(" YAY : " + tested )
-        // println(zoo.length)
-        // // zoo.
-        // println(zoo(0)._1.mkString(" "))
-        // println(zoo(0)._1.length)
-
-        // val row0s = zoo.map((k) => k._2.t(::,0)).distinct
-        // println(row0s.length)
-        // println(row0s.mkString("\n"))
-        // println(zoo(4))
-        // print(row0s(4))
-
-        // println((mId - sM(1))*sM(0))
-
-        // Theory - if p is unimodular, then every factor of p is also unimodular
-
+        val res = polytopia.TestUtils.runTests(wM, (k: (Chain, Cartan)) => checkSemiDefinite(k._2));
+        println("passed: " + res.status + " num tested: " + res.numTested)
     }
 
 }

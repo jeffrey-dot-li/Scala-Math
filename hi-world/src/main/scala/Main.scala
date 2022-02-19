@@ -4,7 +4,7 @@ import scala.collection._
 import algebra.ring._
 import shapeless.Nats
 // import Somebody
-object Test {
+object FinType {
   import shapeless._
   import nat._
   import newtype._
@@ -143,10 +143,10 @@ object Test {
 
     object VectorOps {
       implicit def pointOps(p: VectorType): VectorOps = new VectorOps(p) {
-        def +(other: Self) = newtype(
+        override def +(other: Self) = newtype(
           zip(vector, other.vector).map((a) => scalarField.plus(a._1, a._2))
         );
-        def *(scalar: ScalarType) = newtype(vector.map(v => scalarField.times(v, scalar)))
+        override def *(scalar: ScalarType) = newtype(vector.map(v => scalarField.times(v, scalar)))
         def unary_- = newtype(vector.map(scalarField.negate))
       }
     }
@@ -248,8 +248,8 @@ object Main {
       ));
 
   def main(args: Array[String]): Unit = {
-    import Polytopia._;
-    Polytopia.main();
+    import polytopia._;
+    polytopia.Main.main();
 
     // type Seven = 7
     // // val v = valueOf 
