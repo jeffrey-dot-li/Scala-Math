@@ -8,6 +8,8 @@ import rings.scaladsl._
 import syntax._
 import cats.instances.string
 import breeze.linalg
+import scala.io.StdIn;
+import scala.util.control._
 
 import scala.reflect.runtime.universe._
 import scala.reflect.ClassTag
@@ -23,11 +25,14 @@ object Main {
     }
 
     implicit class MatrixExt(c: Cartan) {
-        def colRepr = Array.tabulate(c.cols)(i => c(::, i))
-        def rowRepr = c.t.colRepr;
+        // Access ith row with c(i,::) and jth col with c(::, j)
+        def rowRepr = Array.tabulate(c.rows)(i => c(i, ::));
+        def colRepr = Array.tabulate(c.cols)(j => c(::, j));
+        // def COB(cM: Cartan) = linalg.inv(cM)*c*cM;
     }
 
-    // implicit object AdditivePoly extends Monoid[]
+    def ColVector(dim: Int)(i: Int) = linalg.DenseVector.tabulate(dim)(j => if (j == i) 1 else 0)
+    def RowVector(dim: Int)(i: Int) = ColVector(dim)(i).t;
 
     type Op[T] = T => T;
     type MP[E] = MultivariatePolynomial[E];
@@ -46,6 +51,7 @@ object Main {
                   0
       ),
       'B' -> ((n: Int) =>
+          //   First Root Shortest
           (i: Int, j: Int) =>
               if (i - j == 0) 2
               else if (i == 1 && j == 0) -2
@@ -86,6 +92,7 @@ object Main {
                   else if (math.abs(i - j) == 1) -1
                   else 0
           ),
+      //   root 2 is longer than root 3, -2 is upper right
       'F' ->
           ((n: Int) =>
               (i: Int, j: Int) =>
@@ -195,7 +202,7 @@ object Main {
                 .mapPairs((p, v) =>
                     if (p._2 == i)
                         if (p._1 == p._2) -1
-                        else -c(p._2, p._1)
+                        else -c(p._1, p._2)
                     else if (p._1 == p._2) 1
                     else 0
                 )
@@ -241,7 +248,7 @@ object Main {
                 }
             }
         }
-        println(dupCount + negCount)
+        // println(dupCount + negCount)
         return zoo;
     }
 
@@ -253,21 +260,111 @@ object Main {
         }
     }
 
-    def testZooResidents() {}
+    // def
+
+    def printMatrixMult(c1: Cartan, c2: Cartan): Cartan = {
+        println();
+        val prodr = (c1 * c2).toString.split("\n");
+        val c1r = c1.toString.split("\n");
+        val c2r = c2.toString.split("\n");
+
+        // c1.rowRepr(0).toArray
+
+        val spacer = c1r(0).map((k) => ' ') + " | ";
+        val horzSpacer = c1r(0).map((k) => '-') + "---" +
+            prodr(0).map((k) => '-')
+
+        for (i <- 0 until c2.rows) {
+            print(spacer);
+            println(c2r(i))
+        }
+
+        println(horzSpacer);
+        for (i <- 0 until c1.rows) {
+            print(c1r(i));
+            print(" | ");
+            println(prodr(i))
+        }
+        println();
+        return c1 * c2;
+    }
+
+    def toDoubleMatrix(o : Cartan) = o.map(v=>v.toDouble);
+    def toIntMatrix(o : linalg.DenseMatrix[Double]) = o.map(v=>math.round(v).toInt);
+
+
+    def MatrixReduction(start: Cartan, goal: Cartan, basis: Array[Cartan], step: Int = 0): Unit = {
+        var in = 0;
+        val inputLoop = new Breaks;
+        if (step == 0) println(start);
+        inputLoop.breakable {
+            while (true) {
+                println(s"Iteration ${step}, Enter Next Step: ")
+                in = StdIn.readInt() - 1;
+                if (in == -2) {
+                    return;
+                }
+                if (in >= 0 && in < basis.length) {
+                    println(s"Input $in");
+                    inputLoop.break;
+                } else {
+                    print(s"Input $in Invalid, Try Again ")
+                }
+            }
+        }
+
+        val stepChoice = basis(in);
+        val res = printMatrixMult(stepChoice, start);
+        if (res == goal) return;
+        return MatrixReduction(res, goal, basis, step + 1);
+    }
+    type MatrixChain = (Chain, Cartan);
+    implicit def MatrixChain2Matrix(p: MatrixChain) = p._2;
+
+    def printLabel(s : Any, label : String = "") = {
+        if(label != "") println(label);
+        println(s)
+        println();
+    }
+
 
     def main(): Unit = {
 
         implicit val dim = 4;
         val rootSystem = RootSystems('F');
-				//  Conjecture: G3+ is infinite? F5+, E9+ also infinite?
-				// Trying to generate the G3 matrices will give you a group with infinite order?
+
+        //  Conjecture: G3+ is infinite? F5+, E9+ also infinite?
+        // Trying to generate the G3 matrices will give you a group with infinite order?
 
         val rangle = Array.range(0, dim).map((k) => s"a_$k")
         implicit val ring = MultivariateRing(Q, rangle);
 
         implicit val c: Cartan = CartanMatrix(dim, rootSystem)
+        val cInv = linalg.inv(c) //.map(v => math.round(v.floatValue()));
 
         val id = (x: ring.PolyType) => x
+        val mId = linalg.DenseMatrix.eye[Int](dim);
+        val revDiag = linalg.DenseMatrix
+            .eye[Int](dim)
+            .mapPairs((p, v) => if (p._1 + p._2 == dim - 1) 1 else 0);
+        // println(revDiag);
+        // println(linalg.inv(revDiag))
+        val sqrt2 = math.sqrt(2);
+
+        val ff = linalg.DenseMatrix(
+          (sqrt2 / 2, 0.0, 0.0, 0.0),
+          (0.0, sqrt2 / 2, 0.0, 0.0),
+          (0.0, 0.0, sqrt2, 0.0),
+          (0.0, 0.0, 0.0, sqrt2)
+        );
+
+        println(ff);
+        val cD = toDoubleMatrix(c);
+        val ffI = linalg.inv(ff)
+        println(ff*cD *ffI);
+
+        def flippy(w : Cartan) = toIntMatrix(ff*toDoubleMatrix(w)*ffI);
+
         val x_ = ring.generators
         val a_ = reflectionRoots(c)
         val s = reflections(a_)
@@ -275,9 +372,20 @@ object Main {
 
         val D = s.mapWithIndex((refl, index) => Differential(a_)(ring)(refl, index));
 
-        def PartialChain(ch: Chain) = ch.map(D);
-        def MonoChain(ch: Chain) = (x_(ch.last) ^ (ch.length));
+        val sM = genReflectionMatrixs(c);
 
+        // Column vector representations of `x_i`
+        val xV = Array.tabulate(dim)(ColVector(dim));
+
+        // The Monomial that gets reduced to one - would be the last element of the chain ^ of the chain len
+        def ChainMono(ch: Chain) = (x_(ch.last) ^ (ch.length));
+        def ChainPartial(ch: Chain) = ch.map(D);
+        def ChainMatrix(ch: Chain) = if (ch.isEmpty) mId else ch.map(sM).reduce((a, b) => a * b);
+        def invM(k: MatrixChain) = (k._1.reverse, ChainMatrix((k._1.reverse)));
+
+        // def
+
+        // def inverseM : Op[MatrixChain] = (c) =>
         // Maximal chains in F4.
         // var chains = Array[Chain](
         //   Array(1, 0),
@@ -285,24 +393,51 @@ object Main {
         //   Array(2, 1, 2),
         //   Array(3, 2, 1, 2, 3)
         // );
-        // var monos = chains.map(MonoChain)
-        // var partialChains = chains.map(PartialChain);
+        // var monos = chains.map(ChainMono)
+        // var partialChains = chains.map(ChainPartial);
 
         // Matrix representation of reflections in `x_i`.
-        val sM = genReflectionMatrixs(c);
-
-        // Column vector representations of `x_i`
-        val xV = x_.mapWithIndex((_, i) =>
-            linalg.DenseVector
-                .zeros[Double](dim)
-                .mapPairs((j, _) =>
-                    if (i == j) 1
-                    else 0
-                )
-        )
 
         // Weyl Group matrix representation
         val wM = genWeylGroupMatrixs(dim, sM, 1500);
+
+        // println(wM.length);
+        // printMatrixMult(sM(1), wM(100)._2);
+        val target = 293;
+        // println(wM(target)._1.length);
+        // printMatrixMult(
+        //   sM(2),
+        //   wM(target)
+        // )
+
+        // println(c * xV(0))
+        // println(sM(0)*c*xV(0));
+        // println(invM(wM(target))*c*xV(0));
+        // println(wM(target))
+
+        // println(c*xV(1  ));
+        // printlnArray(sM);
+        // MatrixReduction(sM(1), mId, sM);
+
+// Conjecture - the ith row in [w] is also equal to the ith column in [w]^-1 in \alpha basis
+// ok
+// if [wx]^T = [wa]^-1 then chilling
+
+        val rM = wM(target);
+        val rMInv = invM(rM);
+        val rMInv_a = (cInv * (rMInv * c).map(v => v.toDouble)).map(v => math.round(v).toInt)
+
+        printLabel(sM(1), "rM");
+        printLabel(flippy(sM(1)), "rM Flippy");
+        // // println(cInv);
+        // println();
+
+        // println(rMInv_a)
+
+        // println()
+        // println("[w]^T - [w^-1]_a:")
+        // println(rM._2.t - rMInv_a)
+        // println(s(1)(              ));
 
         // Checks that in all matrixes of the Weyl Representation,
         // each row is either positive or negative semidefinite.
@@ -310,11 +445,11 @@ object Main {
 
         // Checked for An, Bn, Cn, Dn, F4, G2 | n <= 4.
 
-				// Also checked for G3, E6, F5 |W| <= 1500
+        // Also checked for G3, E6, F5 |W| <= 1500
         def checkSemiDefinite(m: Cartan): Boolean = {
             for (row <- m.rowRepr) {
                 var numRep = 0;
-                for (j <- row) {
+                for (j <- row.t) {
                     if (j < 0) {
                         if (numRep > 0) return false;
                         numRep = -1;
@@ -327,8 +462,8 @@ object Main {
             }
             return true;
         }
-        val res = polytopia.TestUtils.runTests(wM, (k: (Chain, Cartan)) => checkSemiDefinite(k._2));
-        println("passed: " + res.status + " num tested: " + res.numTested)
+        // val res = polytopia.TestUtils.runTests(wM, (k: (Chain, Cartan)) => checkSemiDefinite(k._2));
+        // println("passed: " + res.status + " num tested: " + res.numTested)
     }
 
 }
